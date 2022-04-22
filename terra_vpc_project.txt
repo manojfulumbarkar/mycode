@@ -1,0 +1,145 @@
+
+
+provider "aws" {
+  region     = "ap-south-1"
+  access_key = "AKIATEX4DCQCAVNJIO5V"
+  secret_key = "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"
+}
+
+
+# 1. create vpc
+
+resource "aws_vpc" "demo-vpc" {
+  cidr_block       = "10.0.0.0/16"
+  instance_tenancy = "default"
+
+  tags = {
+    Name = "demo-vpc"
+  }
+}
+
+# 2. create internet gateway
+
+resource "aws_internet_gateway" "gw" {
+  vpc_id = aws_vpc.demo-vpc.id
+
+  tags = {
+    Name = "demo-igw"
+  }
+}
+
+# 3. create custom route table
+
+resource "aws_route_table" "rt" {
+  vpc_id = aws_vpc.demo-vpc.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.gw.id
+  }
+
+  route {
+    ipv6_cidr_block        = "::/0"
+    gateway_id = aws_internet_gateway.gw.id
+  }
+
+  tags = {
+    Name = "demo-rt"
+  }
+}
+
+# 4. create a subnet
+
+resource "aws_subnet" "sub" {
+  vpc_id     = aws_vpc.demo-vpc.id
+  cidr_block = "10.0.1.0/24"
+availability_zone = "ap-south-1a"
+
+  tags = {
+    Name = "demo-sub"
+  }
+}
+# 5. associate subnet with route table
+
+resource "aws_route_table_association" "a" {
+  subnet_id      = aws_subnet.sub.id
+  route_table_id = aws_route_table.rt.id
+}
+
+# 6. create security group to allow port 22, 80, 443
+
+resource "aws_security_group" "sg" {
+  name        = "web_traffic"
+  description = "Allow TLS inbound traffic"
+  vpc_id      = aws_vpc.demo-vpc.id
+
+  ingress {
+    description      = "https"
+    from_port        = 443
+    to_port          = 443
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+  }
+
+ingress {
+    description      = "http"
+    from_port        = 80
+    to_port          = 80
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+  }
+ingress {
+    description      = "ssh"
+    from_port        = 22
+    to_port          = 22
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port        = 0
+    to_port          = 0
+    protocol         = "-1"
+    cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
+  }
+
+  tags = {
+    Name = "sec_gr"
+  }
+}
+
+# 7. create a network interface with an ip in the subnet that was created in step 4
+
+resource "aws_network_interface" "ni" {
+  subnet_id       = aws_subnet.sub.id
+  private_ips     = ["10.0.1.50"]
+  security_groups = [aws_security_group.sg.id]
+  }
+
+# 8. assign an elastic ip to the network interface created in step 7
+
+resource "aws_eip" "eip" {
+  vpc                       = true
+  network_interface         = aws_network_interface.ni.id
+  associate_with_private_ip = "10.0.1.50"
+depends_on = [aws_internet_gateway.gw]
+}
+
+# 9. create ubuntu server and install/enable apache
+
+resource "aws_instance" "web" {
+  ami           = "ami-0567e0d2b4b2169ae"
+  instance_type = "t2.micro"
+key_name = "manoj"
+
+network_interface {
+    network_interface_id = aws_network_interface.ni.id
+    device_index         = 0
+  }
+
+  tags = {
+    Name = "demo-terra"
+  }
+}
+
