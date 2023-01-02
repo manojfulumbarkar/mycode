@@ -1,9 +1,175 @@
+### PROJECT-1
+
+ec2-instance, vpc,one subnet, 
+
+provider "aws" {
+  region = "us-east-1"
+  
+}
+
+#  project_vpc
+# 1. vpc
+
+resource "aws_vpc" "vpc" {
+  cidr_block = "10.0.0.0/16"
+  instance_tenancy = "default"
+
+  tags = {
+    "Name" = "myvpc"
+  }
+  
+}
+
+# 2.internet gateway
+
+resource "aws_internet_gateway" "igw" {
+  vpc_id = aws_vpc.vpc.id
+
+  tags = {
+    "Name" = "my-igw"
+  }
+  
+}
+
+#3. route table
+
+resource "aws_route_table" "rt" {
+  vpc_id = aws_vpc.vpc.id
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.igw.id
+  }
+
+  tags = {
+    "Name" = "my-rt"
+  }
+  
+}
+
+# 4. subnet
+
+resource "aws_subnet" "subnet" {
+  vpc_id = aws_vpc.vpc.id
+  cidr_block = "10.0.1.0/24"
+
+  tags = {
+    "Name" = "public-subnet"
+  }
+  
+}
+
+# 5. subnet association
+
+resource "aws_route_table_association" "rta" {
+  subnet_id = aws_subnet.subnet.id
+  route_table_id = aws_route_table.rt.id
+  
+}
+
+# 6. security group
+
+resource "aws_security_group" "allow_tls" {
+  name        = "allow_tls"
+  description = "Allow TLS inbound traffic"
+  vpc_id      = aws_vpc.vpc.id
+
+  ingress {
+    description      = "https"
+    from_port        = 443
+    to_port          = 443
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+  }
+
+   ingress {
+    description      = "ssh"
+    from_port        = 22
+    to_port          = 22
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description      = "http"
+    from_port        = 80
+    to_port          = 80
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+  }
+
+
+  egress {
+    from_port        = 0
+    to_port          = 0
+    protocol         = "-1"
+    cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
+  }
+
+  tags = {
+    Name = "terraform-sg"
+  }
+}
+
+# 7. ec2 instance
+
+resource "aws_instance" "server" {
+  ami = "ami-0b5eea76982371e91"
+  instance_type = var.instance_type
+  key_name = "newkey"
+  associate_public_ip_address = true
+  subnet_id = aws_subnet.subnet.id
+  vpc_security_group_ids = [aws_security_group.allow_tls.id]
+  user_data = <<EOF
+  #!/bin/bash
+sudo su
+yum install httpd -y
+echo "<!DOCTYPE html>
+<html>
+<body>
+<h1>Hello Mady</h1>
+<p>This Is Server-1</p>
+</body>
+</html>
+" > /var/www/html/index.html
+service httpd restart
+
+EOF
+
+
+  tags = {
+    Name = "web_server"
+    Owner = "mady"  
+  }
+  
+}
+
+variable "instance_type" {
+  description = "type of instance"
+  default = "t2.micro"
+  type = string
+  
+  
+}
+
+output "instance_id" {
+  value = aws_instance.server.id
+  
+}
+
+output "instance_type" {
+  value = aws_instance.server.instance_type
+  
+}
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## PROJECT-2
 
 
 provider "aws" {
   region     = "ap-south-1"
-  access_key = "xxxxxxxxxxxxxx"
-  secret_key = "xxxxxxxxxxxxxx"
+  access_key = "AKIATEX4DCQCAVNJIO5V"
+  secret_key = "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"
 }
 
 
@@ -142,4 +308,745 @@ network_interface {
     Name = "demo-terra"
   }
 }
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+##PROJECT-3
+
+provider "aws" {
+  region = "us-east-1"
+  
+}
+
+##project_vpc
+###vpc
+
+resource "aws_vpc" "vpc" {
+  cidr_block = var.cidr_block
+  instance_tenancy = "default"
+
+  tags = {
+    "Name" = "myvpc"
+  }
+  
+}
+
+##internet gateway
+
+resource "aws_internet_gateway" "igw" {
+  vpc_id = aws_vpc.vpc.id
+
+  tags = {
+    "Name" = "my-igw"
+  }
+  
+}
+
+##route table publi
+
+resource "aws_route_table" "pbrt" {
+  vpc_id = aws_vpc.vpc.id
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.igw.id
+  }
+
+  tags = {
+    "Name" = "my-rt"
+  }
+  
+}
+
+# private route table 
+
+resource "aws_route_table" "prt" {
+  vpc_id = aws_vpc.vpc.id
+  
+}
+
+##subnet
+
+resource "aws_subnet" "public_subnet" {
+  vpc_id = aws_vpc.vpc.id
+  cidr_block = "10.0.1.0/24"
+
+  tags = {
+    "Name" = "public-subnet"
+  }
+  
+}
+
+resource "aws_subnet" "private_subnet" {
+  vpc_id = aws_vpc.vpc.id
+  cidr_block = "10.0.2.0/24"
+
+  tags = {
+    "Name" = "private-subnet"
+  }
+  
+}
+
+##subnet association
+
+resource "aws_route_table_association" "public_rta" {
+  subnet_id = aws_subnet.public_subnet.id
+  route_table_id = aws_route_table.pbrt.id
+  
+}
+
+resource "aws_route_table_association" "private_rta" {
+  subnet_id = aws_subnet.private_subnet.id
+  route_table_id = aws_route_table.prt.id
+  
+}
+
+## security group
+
+resource "aws_security_group" "allow_tls" {
+  name        = "allow_tls"
+  description = "Allow TLS inbound traffic"
+  vpc_id      = aws_vpc.vpc.id
+
+  ingress {
+    description      = "https"
+    from_port        = 443
+    to_port          = 443
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+  }
+
+   ingress {
+    description      = "ssh"
+    from_port        = 22
+    to_port          = 22
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description      = "http"
+    from_port        = 80
+    to_port          = 80
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+  }
+
+
+  egress {
+    from_port        = 0
+    to_port          = 0
+    protocol         = "-1"
+    cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
+  }
+
+  tags = {
+    Name = "terraform-sg"
+  }
+}
+
+## ec2 instance
+
+resource "aws_instance" "server" {
+  ami = "ami-0b5eea76982371e91"
+  instance_type = var.instance_type
+  key_name = "newkey"
+  associate_public_ip_address = true
+  subnet_id = aws_subnet.public_subnet.id
+  vpc_security_group_ids = [aws_security_group.allow_tls.id]
+  user_data = <<EOF
+  #!/bin/bash
+sudo su
+yum install httpd -y
+echo "<!DOCTYPE html>
+<html>
+<body>
+<h1>Hello Mady</h1>
+<p>This Is Server-1</p>
+</body>
+</html>
+" > /var/www/html/index.html
+service httpd restart
+
+EOF
+
+
+  tags = {
+    Name = "web_server"
+    Owner = "mady"  
+  }
+  
+}
+
+## private ec2 instance
+
+resource "aws_instance" "web" {
+  ami = "ami-0b5eea76982371e91"
+  instance_type = "t2.micro"
+  key_name = "newkey"
+  associate_public_ip_address = false
+  subnet_id = aws_subnet.private_subnet.id
+  vpc_security_group_ids = [aws_security_group.allow_tls.id]
+  user_data = <<EOF
+  #!/bin/bash
+sudo su
+yum install httpd -y
+echo "<!DOCTYPE html>
+<html>
+<body>
+<h1>Hello Mady</h1>
+<p>This Is Server-1</p>
+</body>
+</html>
+" > /var/www/html/index.html
+service httpd restart
+
+EOF
+
+
+  tags = {
+    Name = "private-server"
+    Owner = "mady"  
+  }
+  
+}
+
+variable "cidr_block" {
+  description = "cidr for vpc"
+  type = string
+  default = "10.0.0.0/16"
+  
+}
+
+variable "instance_type" {
+  description = "type of instance"
+  default = "t2.micro"
+  type = string
+}
+
+output "instance_id" {
+  value = aws_instance.server.id
+  
+}
+
+output "instance_type" {
+  value = aws_instance.server.instance_type
+  
+}
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+ *PROJECT-4    ----------> (with eip enable)
+
+provider "aws" {
+  region = "us-east-1"
+  
+}
+
+
+##project_vpc
+###vpc
+
+resource "aws_vpc" "vpc" {
+  cidr_block       = "10.0.0.0/16"
+  instance_tenancy = "default"
+
+  tags = {
+    "Name" = "myvpc"
+  }
+
+}
+
+##internet gateway
+
+resource "aws_internet_gateway" "igw" {
+  vpc_id = aws_vpc.vpc.id
+
+  tags = {
+    "Name" = "my-igw"
+  }
+
+}
+
+## creating elastic ip
+
+resource "aws_eip" "eip" {
+  depends_on = [aws_internet_gateway.igw]
+
+}
+
+## nat gateway
+
+resource "aws_nat_gateway" "nat" {
+  allocation_id = aws_eip.eip.id
+  subnet_id     = aws_subnet.public_subnet.id
+  depends_on    = [aws_eip.eip]
+  tags = {
+    "Name" = "my-nat"
+  }
+
+}
+
+
+##route table publi
+
+resource "aws_route_table" "pbrt" {
+  vpc_id = aws_vpc.vpc.id
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.igw.id
+  }
+
+  tags = {
+    "Name" = "public-rt"
+  }
+
+}
+
+# private route table 
+
+resource "aws_route_table" "prt" {
+  vpc_id = aws_vpc.vpc.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_nat_gateway.nat.id
+  }
+
+  tags = {
+    "Name" = "private-rt"
+  }
+
+}
+
+##subnet
+
+resource "aws_subnet" "public_subnet" {
+  vpc_id     = aws_vpc.vpc.id
+  cidr_block = "10.0.1.0/24"
+
+  tags = {
+    "Name" = "public-subnet"
+  }
+
+}
+
+resource "aws_subnet" "private_subnet" {
+  vpc_id     = aws_vpc.vpc.id
+  cidr_block = "10.0.2.0/24"
+
+  tags = {
+    "Name" = "private-subnet"
+  }
+
+}
+
+##subnet association
+
+resource "aws_route_table_association" "public_rta" {
+  subnet_id      = aws_subnet.public_subnet.id
+  route_table_id = aws_route_table.pbrt.id
+
+}
+
+resource "aws_route_table_association" "private_rta" {
+  subnet_id      = aws_subnet.private_subnet.id
+  route_table_id = aws_route_table.prt.id
+
+}
+
+## security group
+
+resource "aws_security_group" "allow_tls" {
+  name        = "allow_tls"
+  description = "Allow TLS inbound traffic"
+  vpc_id      = aws_vpc.vpc.id
+
+  ingress {
+    description = "https"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "ssh"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "http"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+
+  egress {
+    from_port        = 0
+    to_port          = 0
+    protocol         = "-1"
+    cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
+  }
+
+  tags = {
+    Name = "terraform-sg"
+  }
+}
+
+## ec2 instance
+
+resource "aws_instance" "server" {
+  ami                         = "ami-0b5eea76982371e91"
+  instance_type               = var.instance_type
+  key_name                    = "newkey"
+  associate_public_ip_address = true
+  subnet_id                   = aws_subnet.public_subnet.id
+  vpc_security_group_ids      = [aws_security_group.allow_tls.id]
+  user_data                   = <<EOF
+  #!/bin/bash
+sudo su
+yum install httpd -y
+echo "<!DOCTYPE html>
+<html>
+<body>
+<h1>Hello Mady</h1>
+<p>This Is Server-1</p>
+</body>
+</html>
+" > /var/www/html/index.html
+service httpd restart
+
+EOF
+
+
+  tags = {
+    Name  = "web_server"
+    Owner = "mady"
+  }
+
+}
+
+resource "aws_instance" "web" {
+  ami                         = "ami-0b5eea76982371e91"
+  instance_type               = "t2.micro"
+  key_name                    = "newkey"
+  associate_public_ip_address = false
+  subnet_id                   = aws_subnet.private_subnet.id
+  vpc_security_group_ids      = [aws_security_group.allow_tls.id]
+  user_data                   = <<EOF
+  #!/bin/bash
+sudo su
+yum install httpd -y
+echo "<!DOCTYPE html>
+<html>
+<body>
+<h1>Hello Mady</h1>
+<p>This Is Server-1</p>
+</body>
+</html>
+" > /var/www/html/index.html
+service httpd restart
+
+EOF
+
+
+  tags = {
+    Name  = "private-server"
+    Owner = "mady"
+  }
+
+}
+
+variable "instance_type" {
+  description = "instance type"
+  type        = string
+  default     = "t2.micro"
+
+}
+
+output "eip" {
+    value = aws_eip.eip.public_ip
+  
+}
+
+output "vpc_id" {
+    value = aws_vpc.vpc.id
+  
+}
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+*****PROJECT-5
+
+-- all blocks in seperate files
+
+------------------------provider.tf-------------------
+
+provider "aws" {
+  region = "us-east-1"
+  
+}
+
+------------------------main.tf------------------
+
+
+
+##project_vpc
+###vpc
+
+resource "aws_vpc" "vpc" {
+  cidr_block = var.cidr_block
+  instance_tenancy = "default"
+
+  tags = {
+    "Name" = "myvpc"
+  }
+  
+}
+
+##internet gateway
+
+resource "aws_internet_gateway" "igw" {
+  vpc_id = aws_vpc.vpc.id
+
+  tags = {
+    "Name" = "my-igw"
+  }
+  
+}
+
+## nat gateway
+
+resource "aws_nat_gateway" "ngw" {
+  connectivity_type = "private"
+  subnet_id         = aws_subnet.public_subnet.id
+
+  tags = {
+    "Name" = "mynat"
+  }
+}
+
+##route table publi
+
+resource "aws_route_table" "pbrt" {
+  vpc_id = aws_vpc.vpc.id
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.igw.id
+  }
+
+  tags = {
+    "Name" = "public-rt"
+  }
+  
+}
+
+# private route table 
+
+resource "aws_route_table" "prt" {
+  vpc_id = aws_vpc.vpc.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_nat_gateway.ngw.id
+  }
+
+  tags = {
+    "Name" = "private-rt"
+  }
+  
+}
+
+##subnet
+
+resource "aws_subnet" "public_subnet" {
+  vpc_id = aws_vpc.vpc.id
+  cidr_block = "10.0.1.0/24"
+
+  tags = {
+    "Name" = "public-subnet"
+  }
+  
+}
+
+resource "aws_subnet" "private_subnet" {
+  vpc_id = aws_vpc.vpc.id
+  cidr_block = "10.0.2.0/24"
+
+  tags = {
+    "Name" = "private-subnet"
+  }
+  
+}
+
+##subnet association
+
+resource "aws_route_table_association" "public_rta" {
+  subnet_id = aws_subnet.public_subnet.id
+  route_table_id = aws_route_table.pbrt.id
+  
+}
+
+resource "aws_route_table_association" "private_rta" {
+  subnet_id = aws_subnet.private_subnet.id
+  route_table_id = aws_route_table.prt.id
+  
+}
+
+## security group
+
+resource "aws_security_group" "allow_tls" {
+  name        = "allow_tls"
+  description = "Allow TLS inbound traffic"
+  vpc_id      = aws_vpc.vpc.id
+
+  ingress {
+    description      = "https"
+    from_port        = 443
+    to_port          = 443
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+  }
+
+   ingress {
+    description      = "ssh"
+    from_port        = 22
+    to_port          = 22
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description      = "http"
+    from_port        = 80
+    to_port          = 80
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+  }
+
+
+  egress {
+    from_port        = 0
+    to_port          = 0
+    protocol         = "-1"
+    cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
+  }
+
+  tags = {
+    Name = "terraform-sg"
+  }
+}
+ 
+## ec2 instance
+
+resource "aws_instance" "server" {
+  ami = "ami-0b5eea76982371e91"
+  instance_type = var.instance_type
+  key_name = "newkey"
+  associate_public_ip_address = true
+  subnet_id = aws_subnet.public_subnet.id
+  vpc_security_group_ids = [aws_security_group.allow_tls.id]
+  user_data = <<EOF
+  #!/bin/bash
+sudo su
+yum install httpd -y
+echo "<!DOCTYPE html>
+<html>
+<body>
+<h1>Hello Mady</h1>
+<p>This Is Server-1</p>
+</body>
+</html>
+" > /var/www/html/index.html
+service httpd restart
+
+EOF
+
+
+  tags = {
+    Name = "web_server"
+    Owner = "mady"  
+  }
+  
+}
+
+resource "aws_instance" "web" {
+  ami = "ami-0b5eea76982371e91"
+  instance_type = "t2.micro"
+  key_name = "newkey"
+  associate_public_ip_address = false
+  subnet_id = aws_subnet.private_subnet.id
+  vpc_security_group_ids = [aws_security_group.allow_tls.id]
+  user_data = <<EOF
+  #!/bin/bash
+sudo su
+yum install httpd -y
+echo "<!DOCTYPE html>
+<html>
+<body>
+<h1>Hello Mady</h1>
+<p>This Is Server-1</p>
+</body>
+</html>
+" > /var/www/html/index.html
+service httpd restart
+
+EOF
+
+
+  tags = {
+    Name = "private-server"
+    Owner = "mady"  
+  }
+  
+}
+
+
+-----------------------------variables.tf-------------------------
+
+
+variable "cidr_block" {
+  description = "cidr for vpc"
+  type = string
+  default = "10.0.0.0/16"
+  
+}
+
+variable "instance_type" {
+  description = "type of instance"
+  default = "t2.micro"
+  type = string
+}
+
+----------------------------output.tf------------------------
+
+output "instance_id" {
+  value = aws_instance.server.id
+  
+}
+
+output "instance_type" {
+  value = aws_instance.server.instance_type
+  
+}
+
+output "cidr_block_vpc" {
+    value = aws_vpc.vpc.cidr_block
+}
+
+output "vpc_arn" {
+    value = aws_vpc.vpc.arn
+  
+}
+
+
 
