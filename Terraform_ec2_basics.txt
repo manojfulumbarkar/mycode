@@ -1,0 +1,388 @@
+terraform commands
+	-terraform init
+	-terraform validate
+	-terraform plan
+	-terraform plan -out test.out		-store all data in test.out file
+	-terraform fmt        		       	-it wiil set all code in specific manner
+	-terraform apply			-or terrafprm apply --auto-approve
+	-terraform destroy			-or terraform destroy --auto-approve
+	-terraform state list
+	-terraform state show
+	-terraform output
+	-terraform refresh
+
+
+1)creating instance with elastic ip
+
+resource "aws_instance" "main" {
+ami = "ami-0af25d0df86db00c1"
+instance_type = "t2.micro"
+key_name = "manoj"
+
+tags = {
+Name = "terra"
+}
+}
+
+	 -now we will add eip resource block with all other services as default
+
+resource "aws_instance" "main" {
+ami = "ami-0af25d0df86db00c1"
+instance_type = "t2.micro"
+key_name = "manoj"
+
+tags = {
+Name = "terra"
+}
+}
+
+resource "aws_eip" "main" {
+instance = aws_instance.main.id
+vpc = true  
+}
+
+	-vpc=true (it will take default vpc)
+	-key name = manoj (it is existing key)
+	-terraform plan
+	-terraform apply
+
+2)creating new key pair
+- go on terminal and type ssh-keygen and then type key name
+ $ ssh-keygen
+Generating public/private rsa key pair.
+Enter file in which to save the key (/home/manoj/.ssh/id_rsa):mykey
+
+Enter passphrase (empty for no passphrase):
+Enter same passphrase again:
+Your identification has been saved in mykey
+Your public key has been saved in mykey.pub
+The key fingerprint is:
+SHA256:fwXGIbrHcfGswSNr6ULaAip/QUdAaC1CU+kye/2bcho manoj@Shree
+The key's randomart image is:
++---[RSA 3072]----+
+|.o.=+.    . o    |
+|. =.. .  . + =   |
+| o.. .  . o O o  |
+| o .. .  o B =   |
+|  +.o.  S * . .  |
+| . o.o + =   .   |
+|. o  E+ o o .    |
+| o  ...+.. .     |
+|  .. .+o.        |
++----[SHA256]-----+
+
+-the key is generated(mykey.pub).now you can check by applying command (ls -ltr)
+-copy contents from mykey.pub and put as public_key in resource block
+
+resource "aws_instance" "main" {
+ami = "ami-03fa4afc89e4a8a09"
+instance_type = "t2.micro"
+key_name = "mykey"
+
+
+tags = {
+Name = "demo"
+}
+}
+
+resource "aws_key_pair" "key" {
+key_name = "mykey"
+public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDZcERZtIgE6YQ0ceE1F8jOw9fKM6uu7+2lb28mLmQ
+}
+
+
+3) user data
+
+provider "aws" {
+  region = "us-east-1"
+}
+
+resource "aws_instance" "server" {
+  ami = "ami-0b5eea76982371e91"
+  instance_type = "t2.micro"
+  key_name = "newkey"
+  security_groups = ["k8s-sg"]
+  user_data = <<EOF
+  #!/bin/bash
+sudo su
+yum install httpd -y
+echo "<!DOCTYPE html>
+<html>
+<body>
+<h1>Hello Mady</h1>
+<p>This Is Server-1</p>
+</body>
+</html>
+" > /var/www/html/index.html
+service httpd restart
+
+
+EOF
+
+  tags = {
+    Name = "web_server"
+    Owner = "mady"  
+  }
+  
+}
+
+-------------------------------------------------------------------------------------------------------------------------------
+4) variable and output
+
+provider "aws" {
+  region = "us-east-1"
+  
+}
+
+
+resource "aws_instance" "server" {
+  ami                        = "ami-0b5eea76982371e91"
+  instance_type    = var.instance_type
+  key_name           = "newkey"
+  security_groups = ["k8s-sg"]
+  associate_public_ip_address = false
+  user_data = <<EOF
+  #!/bin/bash
+sudo su
+yum install httpd -y
+echo "<!DOCTYPE html>
+<html>
+<body>
+<h1>Hello Mady</h1>
+<p>This Is Server-1</p>
+</body>
+</html>
+" > /var/www/html/index.html
+service httpd restart
+EOF
+
+  tags = {
+    Name = "web_server"
+    Owner = "mady"  
+  }
+  
+}
+
+variable "instance_type" {
+  description = "type of instance"
+  default = "t2.micro"
+  type = string
+  
+  
+}
+
+output "instance_id" {
+  value = aws_instance.server.id
+  
+}
+
+output "instance_type" {
+  value = aws_instance.server.instance_type
+  
+}
+3)creating instance with security group and allowing port 443, 80 and 22
+
+
+resource "aws_instance" "main" {
+ami = "ami-0af25d0df86db00c1"
+instance_type = "t2.micro"
+key_name = "manoj"
+vpc_security_group_ids = [aws_security_group.main.id]      or     security_groups = ["k8s-sg"]
+
+tags = {
+Name = "terra"
+}
+}
+
+resource "aws_instance" "web" {
+ami = "ami-0af25d0df86db00c1"
+instance_type = "t2.small"
+key_name = "manoj"
+
+tags = {
+Name = "terra1"
+}
+}
+
+
+resource "aws_security_group" "main" {
+name = "new_sg_terra"
+description = "this_is_new_sg"
+
+ingress {
+
+description = "http"
+from_port = "80"
+to_port = "80"
+protocol = "tcp"
+cidr_blocks = ["0.0.0.0/0"]                  ## security_group = [aws_security_group.my-sg.id]   custom sg
+}
+
+ingress {
+
+description = "https"
+from_port = "443"
+to_port = "443"
+protocol = "tcp"
+cidr_blocks = ["0.0.0.0/0"]
+}
+
+ingress {
+
+description = "ssh"
+from_port = "22"
+to_port = "22"
+protocol = "tcp"
+cidr_blocks = ["0.0.0.0/0"]
+}
+
+
+egress {
+from_port = "0"
+to_port = "0"
+protocol = "-1"
+cidr_blocks = ["0.0.0.0/0"]
+}
+
+tags = {
+Name = "new_sg"
+}
+}
+ 
+	-terraform plan
+	-terraform apply
+
+
+4) data sources 
+- take existing subnet id from aws 
+
+data "aws_subnet" "selected" {
+  filter {
+    name   = "tag:Name"
+    values = ["project-subnet-public1-us-east-2a"]
+  }
+}
+
+### instance
+resource "aws_instance" "main" {
+ami = "ami-0c6a6b0e75b2b6ce7"
+instance_type = "t2.micro"
+key_name = "manoj"
+subnet_id = data.aws_subnet.selected.id
+
+tags = {
+Name = "test"
+}
+}
+
+---------------------------------
+
+5) variable
+- 
+
+data "aws_subnet" "selected" {
+  filter {
+    name   = "tag:Name"
+    values = [var.subnet]
+  }
+}
+
+### instance
+resource "aws_instance" "main" {
+ami = "ami-0c6a6b0e75b2b6ce7"
+instance_type = "t2.micro"
+key_name = "manoj"
+subnet_id = data.aws_subnet.selected.id
+
+tags = {
+Name = "test"
+}
+}
+
+######
+variable "subnet" {
+description = "this is name of subnet"
+type = string
+default = "project-subnet-public1-us-east-2a"
+
+----------------------------------------------
+
+6) file-seperation
+
+provider {
+-------
+-------
+}
+
+resources {
+------
+------
+}
+
+data {
+-----
+-----
+}
+
+variable {
+-----
+-----
+}
+
+now we seperate all these blocks in seperate files
+
+*provider.tf*
+
+provider "aws" {
+  region     = "us-east-2"
+  access_key = "*****************"
+  secret_key = "***************************"
+}
+
+
+
+    *main.tf*
+
+### instance
+resource "aws_instance" "main" {
+ami = "ami-0c6a6b0e75b2b6ce7"
+instance_type = "t2.micro"
+key_name = "manoj"
+subnet_id = data.aws_subnet.selected.id
+
+tags = {
+Name = "test"
+}
+}
+
+ *data.tf*
+
+data "aws_subnet" "selected" {
+  filter {
+    name   = "tag:Name"
+    values = [var.subnet]
+  }
+}
+
+  *variable.tf*
+
+variable "subnet" {
+description = "this is name of subnet"
+type = string
+default = "project-subnet-public1-us-east-2a"
+}
+
+  *output.tf* 
+
+output "instance_state" {
+  description = "ID of project VPC"
+  value       = aws_instance.main.instance_state
+}
+
+output "arn" {
+  value       = aws_instance.main.arn
+}
+
+output "tags_all" {
+  value       = aws_instance.main.tags_all
+}

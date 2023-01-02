@@ -1,0 +1,355 @@
+provider "aws" {
+  region     = "us-east-2"
+  access_key = "*********"
+  secret_key = "**************"
+}
+
+resource "aws_vpc" "demo-vpc" {
+    cidr_block = var.cidr
+    enable_dns_hostnames = var.enable_dns_hostnames
+    enable_dns_support = var.enable_dns_support
+
+    tags = {
+      "Name" = var.vpc_name
+    }
+}
+
+variable "cidr" {
+    description = "cidr range required for vpc"
+    type = string
+    default = "10.0.0.0/16"
+  
+}
+
+variable "enable_dns_hostnames" {
+    description = "enable dns hostname"
+    type = bool
+    default = null
+  
+}
+
+variable "enable_dns_support" {
+    description = "enable dns support"
+    type = bool
+    default = null
+  
+}
+
+
+variable "vpc_name" {
+    description = "tag for vpc"
+    type = string
+    default = "myvpc"
+
+}
+
+output "vpc_id" {
+    value = aws_vpc.demo-vpc.id
+
+}
+
+
+
+###############################################################################################
+
+   VPC-NETWORKING
+
+          ### provider.tf
+
+
+
+          ## main.tf ###
+
+
+resource "aws_vpc" "demo-vpc" {
+    cidr_block = var.cidr
+    enable_dns_hostnames = var.enable_dns_hostnames
+    enable_dns_support = var.enable_dns_support
+
+    tags = {
+      "Name" = var.vpc_name
+    }
+}
+
+## Internet gateway
+
+resource "aws_internet_gateway" "igw" {
+    vpc_id = aws_vpc.demo-vpc.id
+
+    tags = {
+      "Name" = var.igw_name
+    }
+  
+}
+
+## public subnet
+
+resource "aws_subnet" "public_subnet_1" {
+    vpc_id = aws_vpc.demo-vpc.id
+    cidr_block = var.public_subnet_1_cidr
+    availability_zone = data.aws_availability_zones.east.names[0]
+    map_public_ip_on_launch = var.map_public_ip_on_launch
+
+    tags = {
+      "Name" = var.public_subnet_1_tag
+    }
+  
+}
+
+resource "aws_subnet" "public_subnet_2" {
+    vpc_id = aws_vpc.demo-vpc.id
+    cidr_block = var.public_subnet_2_cidr
+    availability_zone = data.aws_availability_zones.east.names[1]
+    map_public_ip_on_launch = var.map_public_ip_on_launch
+
+    tags = {
+      "Name" = var.public_subnet_2_tag
+    }
+  
+}
+
+## private subnets
+
+resource "aws_subnet" "private_subnet_1" {
+    vpc_id = aws_vpc.demo-vpc.id
+    cidr_block = var.private_subnet_1_cidr
+    availability_zone = data.aws_availability_zones.east.names[0]
+    map_public_ip_on_launch = false
+
+  tags = {
+    "Name" = var.pr_subnet_1_tag
+  }
+}
+
+resource "aws_subnet" "private_subnet_2" {
+    vpc_id = aws_vpc.demo-vpc.id
+    cidr_block = var.private_subnet_2_cidr
+    availability_zone = data.aws_availability_zones.east.names[1]
+    map_public_ip_on_launch = false
+
+    tags = {
+      "Name" = var.pr_subnet_2_tag
+    }
+  
+}
+
+### public route table 
+
+resource "aws_route_table" "public_route_table" {
+    vpc_id = aws_vpc.demo-vpc.id
+
+    tags = {
+      "Name" = "public_rt"
+    }
+  
+}
+
+resource "aws_route" "public_internet_gateway" {
+    route_table_id = aws_route_table.public_route_table.id
+    destination_cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.igw.id
+  
+}
+
+### private route table
+
+resource "aws_route_table" "private_route_table" {
+    vpc_id = aws_vpc.demo-vpc.id
+
+    tags = {
+      "Name" = "private_rt"
+    }
+  
+}
+
+## subnets assiciation with rt
+
+resource "aws_route_table_association" "public_rt_association_1" {
+    subnet_id = aws_subnet.public_subnet_1.id
+    route_table_id = aws_route_table.public_route_table.id 
+}
+
+resource "aws_route_table_association" "public_rt_association_2" {
+    subnet_id = aws_subnet.public_subnet_2.id
+    route_table_id = aws_route_table.public_route_table.id
+  
+}
+
+resource "aws_route_table_association" "private_rt_association_1" {
+    subnet_id = aws_subnet.private_subnet_1.id
+    route_table_id = aws_route_table.private_route_table.id
+  
+}
+
+resource "aws_route_table_association" "private_rt_association_2" {
+    subnet_id = aws_subnet.private_subnet_2.id
+    route_table_id = aws_route_table.private_route_table.id
+  
+}
+
+### security group
+
+resource "aws_security_group" "sg" {
+    name = "my_security_group"
+    description = "security group for new project"
+    vpc_id = aws_vpc.demo-vpc.id
+
+    ingress = [
+        {
+            description = "all traffic"
+            from_port = 0
+            to_port = 0
+            protocol = "-1"
+            cidr_blocks = ["0.0.0.0/0"]
+            ipv6_cidr_blocks = null
+            prefix_list_ids  = null
+            security_groups  = null
+            self             = null
+
+        }
+    ]
+
+     egress = [
+    {
+      from_port        = 0
+      to_port          = 0
+      protocol         = "-1"
+      cidr_blocks      = ["0.0.0.0/0"]
+      ipv6_cidr_blocks = ["::/0"]
+      description      = "Outbound rule"
+      prefix_list_ids  = null
+      security_groups  = null
+      self             = null
+    }
+  ]
+tags = {
+  "Name" = "pro_security_grp"
+}
+  
+}
+
+
+       #### varaibles.tf ###
+
+
+variable "cidr" {
+    description = "cidr range required for vpc"
+    type = string
+    default = "10.0.0.0/16"
+  
+}
+
+variable "enable_dns_hostnames" {
+    description = "enable dns hostname"
+    type = bool
+    default = null
+  
+}
+
+variable "enable_dns_support" {
+    description = "enable dns support"
+    type = bool
+    default = null
+  
+}
+
+
+variable "vpc_name" {
+    description = "tag for vpc"
+    type = string
+    default = "myvpc"
+
+}
+
+variable "igw_name" {
+    description = "name of internet gateway"
+    type = string
+    default = "myigw"
+  
+}
+
+variable "public_subnet_1_cidr" {
+    description = "public subnet 1 cidr block"
+    type = string
+    default = "10.0.1.0/24"
+
+}
+
+variable "map_public_ip_on_launch" {
+    description = "It will map the public ip while launching resources"
+    type = bool
+    default = null
+  
+}
+
+variable "public_subnet_1_tag" {
+    description = "name of pblic subnet 1 "
+    type = string
+    default = "pb_subnet_1"
+
+}
+
+### subnet 2
+
+variable "public_subnet_2_cidr" {
+    description = "cidr block for pb subnet 2"
+    type = string
+    default = "10.0.2.0/24"
+
+}
+
+variable "public_subnet_2_tag" {
+    description = "tag for pblic subnet 2"
+    type = string
+    default = "pb_subnet_2"
+  
+}
+
+### pr subnets
+
+variable "private_subnet_1_cidr" {
+    description = "cidr block for private subnet 1"
+    type = string
+    default = "10.0.5.0/24"
+  
+}
+
+variable "pr_subnet_1_tag" {
+    description = "tag for private subnet 1"
+    type = string
+    default = "pr_subnet_1"
+  
+}
+
+variable "private_subnet_2_cidr" {
+    description = "cidr block for private subnet 2"
+    type = string
+    default = "10.0.6.0/24"
+  
+}
+
+variable "pr_subnet_2_tag" {
+    description = "tag for private subnet 2"
+    type = string
+    default = "pr_subnet_2"
+
+  
+}
+
+
+         ## data.tf
+
+data "aws_availability_zones" "east" {
+    state = "available"
+  
+}
+
+
+         ## output.tf
+
+output "vpc_id" {
+    value = aws_vpc.demo-vpc.id
+
+}
+
+
